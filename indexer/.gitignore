@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Generated files
+generated/
+dist/
+
+# Envio
+.envio/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

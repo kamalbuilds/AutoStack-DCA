@@ -1,0 +1,161 @@
+# Basic DCA Strategy (original)
+type Strategy {
+  id: ID!
+  strategyId: String!
+  user: String!
+  tokenIn: String!
+  tokenOut: String!
+  amountPerExecution: BigInt!
+  frequency: BigInt!
+  totalExecutions: BigInt!
+  executionsCompleted: BigInt!
+  totalAmountIn: BigInt!
+  totalAmountOut: BigInt!
+  status: String!
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+  completedAt: BigInt
+  cancelledAt: BigInt
+  executions: [Execution!]! @derivedFrom(field: "strategy")
+}
+
+type Execution {
+  id: ID!
+  strategy: Strategy!
+  strategyId: String!
+  user: String!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  executionsLeft: BigInt!
+  executedAt: BigInt!
+  executedAtBlock: BigInt!
+  transactionHash: String!
+}
+
+# Smart Money DCA Strategy (advanced)
+type SmartMoneyStrategy {
+  id: ID!
+  strategyId: String!
+  user: String!
+  strategyType: Int! # 0=BASIC, 1=SMART_MONEY, 2=LIMIT_ORDER, 3=TWAP, 4=STOP_LOSS, 5=SMART_ACCUMULATE
+  triggerType: Int! # 0=TIME, 1=SM_BUY, 2=SM_SELL, 3=PRICE_BELOW, 4=PRICE_ABOVE, 5=VOLUME, 6=MULTI
+  tokenIn: String!
+  tokenOut: String!
+  amountPerExecution: BigInt!
+  totalBudget: BigInt!
+  usedBudget: BigInt!
+  maxExecutions: BigInt!
+  executionsCompleted: BigInt!
+  minInterval: BigInt!
+  lastExecution: BigInt!
+  expiresAt: BigInt!
+  active: Boolean!
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+  # Smart Money Config (if applicable)
+  minWhaleAmount: BigInt
+  labelScore: BigInt
+  signalThreshold: Int
+  cooldownPeriod: BigInt
+  # Price Config (if applicable)
+  targetPrice: BigInt
+  slippageBps: BigInt
+  buyBelow: Boolean
+  # Derived
+  smartMoneyExecutions: [SmartMoneyExecution!]! @derivedFrom(field: "strategy")
+  signals: [SmartMoneySignal!]! @derivedFrom(field: "strategy")
+}
+
+type SmartMoneyExecution {
+  id: ID!
+  strategy: SmartMoneyStrategy!
+  strategyId: String!
+  user: String!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  triggerReason: Int! # TriggerType enum
+  signalHash: String
+  executedAt: BigInt!
+  executedAtBlock: BigInt!
+  transactionHash: String!
+  gasUsed: BigInt!
+}
+
+type SmartMoneySignal {
+  id: ID!
+  signalHash: String!
+  strategy: SmartMoneyStrategy
+  walletAddress: String!
+  label: String!
+  score: BigInt!
+  amount: BigInt! # In USD (6 decimals)
+  token: String!
+  timestamp: BigInt!
+  originalTxHash: String!
+  triggeredExecution: Boolean!
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+}
+
+# User Statistics
+type UserStats {
+  id: ID!
+  user: String!
+  totalStrategies: BigInt!
+  activeStrategies: BigInt!
+  completedStrategies: BigInt!
+  cancelledStrategies: BigInt!
+  totalExecutions: BigInt!
+  totalAmountIn: BigInt!
+  totalAmountOut: BigInt!
+  # Smart Money specific
+  smartMoneyStrategies: BigInt!
+  smartMoneyExecutions: BigInt!
+  smartMoneyTriggeredTrades: BigInt!
+}
+
+# Global Platform Statistics
+type GlobalStats {
+  id: ID!
+  totalStrategies: BigInt!
+  activeStrategies: BigInt!
+  completedStrategies: BigInt!
+  cancelledStrategies: BigInt!
+  totalExecutions: BigInt!
+  totalAmountIn: BigInt!
+  totalAmountOut: BigInt!
+  uniqueUsers: BigInt!
+  # Smart Money metrics
+  totalSmartMoneyStrategies: BigInt!
+  totalSmartMoneyExecutions: BigInt!
+  totalSmartMoneySignals: BigInt!
+  totalProtocolFees: BigInt!
+}
+
+# Tracked Smart Money Wallets (from Nansen)
+type TrackedWallet {
+  id: ID!
+  address: String!
+  labels: [String!]!
+  score: BigInt!
+  totalTrades: BigInt!
+  totalVolumeUsd: BigInt!
+  firstSeen: BigInt!
+  lastSeen: BigInt!
+  triggeredExecutions: BigInt!
+}
+
+# Token Analytics
+type TokenAnalytics {
+  id: ID!
+  tokenAddress: String!
+  symbol: String
+  name: String
+  decimals: Int
+  totalStrategies: BigInt!
+  activeStrategies: BigInt!
+  totalVolume: BigInt!
+  smartMoneyBuys: BigInt!
+  smartMoneySells: BigInt!
+  lastSmartMoneyActivity: BigInt
+}

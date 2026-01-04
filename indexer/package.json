@@ -1,0 +1,22 @@
+{
+  "name": "autostack-dca-indexer",
+  "version": "1.0.0",
+  "description": "Envio HyperIndex indexer for AutoStackDCA contract",
+  "scripts": {
+    "codegen": "envio codegen",
+    "dev": "envio dev",
+    "start": "envio start",
+    "stop": "envio stop",
+    "test": "mocha"
+  },
+  "dependencies": {
+    "envio": "^2.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,17 @@
+name: autostack-dca-indexer
+description: Indexes DCA strategy events for AutoStackDCA contract
+contracts:
+  - name: AutoStackDCA
+    handler: src/EventHandlers.ts
+    events:
+      - event: "StrategyCreated(uint256 indexed strategyId, address indexed user, address tokenIn, address tokenOut, uint256 amountPerExecution, uint256 frequency, uint256 totalExecutions)"
+      - event: "DCAExecuted(uint256 indexed strategyId, address indexed user, uint256 amountIn, uint256 amountOut, uint256 executionsLeft)"
+      - event: "StrategyCompleted(uint256 indexed strategyId, address indexed user)"
+      - event: "StrategyCancelled(uint256 indexed strategyId, address indexed user)"
+networks:
+  - id: 84532
+    start_block: 35880000
+    contracts:
+      - name: AutoStackDCA
+        address:
+          - "0x29846754737248d7d81998762B32471967B0c862"
