@@ -3,7 +3,7 @@
 import { formatUnits } from 'viem'
 import type { Strategy } from '@/lib/envio'
 import { getTokenSymbol, getTokenLogo, getTokenDecimals } from '@/lib/tokens'
-import Image from 'next/image'
+import { STRATEGY_TYPES } from '@/lib/contracts'
 
 interface StrategyCardProps {
   strategy: Strategy
@@ -11,6 +11,7 @@ interface StrategyCardProps {
 
 function formatFrequency(frequency: string): string {
   const seconds = BigInt(frequency)
+  if (seconds === 3600n) return 'Hourly'
   if (seconds === 86400n) return 'Daily'
   if (seconds === 604800n) return 'Weekly'
   if (seconds < 3600n) return `Every ${seconds / 60n} min`
@@ -29,6 +30,19 @@ function formatTimestamp(timestamp: string): string {
   })
 }
 
+function getStrategyTypeInfo(strategyType?: number): { name: string; color: string; gradient: string } {
+  switch (strategyType) {
+    case STRATEGY_TYPES.SMART_MONEY_DCA:
+      return { name: 'Smart Money', color: 'text-[#f59e0b]', gradient: 'from-[#f59e0b] to-[#d97706]' }
+    case STRATEGY_TYPES.SMART_ACCUMULATE:
+      return { name: 'Accumulate', color: 'text-[#10b981]', gradient: 'from-[#10b981] to-[#059669]' }
+    case STRATEGY_TYPES.HYBRID:
+      return { name: 'Hybrid', color: 'text-[#7c3aed]', gradient: 'from-[#7c3aed] to-[#5b21b6]' }
+    default:
+      return { name: 'Basic DCA', color: 'text-[#6b7280]', gradient: 'from-[#6b7280] to-[#4b5563]' }
+  }
+}
+
 export function StrategyCard({ strategy }: StrategyCardProps) {
   const tokenInSymbol = getTokenSymbol(strategy.tokenIn)
   const tokenOutSymbol = getTokenSymbol(strategy.tokenOut)
@@ -37,6 +51,8 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
   const tokenInDecimals = getTokenDecimals(strategy.tokenIn)
   const amountFormatted = formatUnits(BigInt(strategy.amountPerExecution), tokenInDecimals)
   const progress = (Number(strategy.executionsCompleted) / Number(strategy.totalExecutions)) * 100
+  const strategyTypeInfo = getStrategyTypeInfo(strategy.strategyType)
+  const isSmartMoney = strategy.strategyType && strategy.strategyType !== STRATEGY_TYPES.BASIC_DCA
 
   return (
     <div className="glass-card p-6 hover:border-[--border-default] transition-all duration-300 group">
@@ -72,9 +88,14 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
             </span>
           </div>
         </div>
-        <span className={`badge ${strategy.isActive ? 'badge-active' : 'badge-inactive'}`}>
-          {strategy.isActive ? 'Active' : strategy.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r ${strategyTypeInfo.gradient} text-white`}>
+            {strategyTypeInfo.name}
+          </span>
+          <span className={`badge ${strategy.isActive ? 'badge-active' : 'badge-inactive'}`}>
+            {strategy.isActive ? 'Active' : strategy.status}
+          </span>
+        </div>
       </div>
 
       {/* Stats */}
@@ -95,6 +116,19 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
             <span className="text-sm font-semibold text-[--text-primary]">{formatFrequency(strategy.frequency)}</span>
           </div>
         </div>
+
+        {/* Smart Money Info */}
+        {isSmartMoney && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-[--text-tertiary]">Trigger</span>
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#f59e0b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-sm font-semibold text-[#f59e0b]">Whale Activity</span>
+            </div>
+          </div>
+        )}
 
         {/* Progress */}
         <div>

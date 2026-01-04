@@ -23,6 +23,9 @@ export interface Strategy {
   createdAtBlock: string
   completedAt: string | null
   cancelledAt: string | null
+  // V2 fields
+  strategyType?: number
+  poolFee?: number
   // Computed for compatibility
   isActive?: boolean
 }
@@ -37,6 +40,10 @@ export interface Execution {
   executedAt: string
   executedAtBlock: string
   transactionHash: string
+  // V2 fields
+  triggeredBySmartMoney?: boolean
+  whaleWallet?: string
+  whaleAmountUsd?: string
   // Computed for compatibility
   executionNumber?: string
 }
@@ -61,6 +68,8 @@ export const GET_USER_STRATEGIES = gql`
       createdAtBlock
       completedAt
       cancelledAt
+      strategyType
+      poolFee
     }
   }
 `
@@ -77,6 +86,9 @@ export const GET_STRATEGY_EXECUTIONS = gql`
       executedAt
       executedAtBlock
       transactionHash
+      triggeredBySmartMoney
+      whaleWallet
+      whaleAmountUsd
     }
   }
 `
@@ -97,6 +109,9 @@ export const GET_ALL_EXECUTIONS_BY_USER = gql`
       executedAt
       executedAtBlock
       transactionHash
+      triggeredBySmartMoney
+      whaleWallet
+      whaleAmountUsd
     }
   }
 `
@@ -124,16 +139,19 @@ export const GET_USER_STATS = gql`
 // Query functions
 export async function getUserStrategies(userAddress: string): Promise<Strategy[]> {
   try {
+    console.log('[Envio] Fetching strategies for user:', userAddress.toLowerCase())
     const data = await envioClient.request<{ Strategy: Strategy[] }>(GET_USER_STRATEGIES, {
       user: userAddress.toLowerCase(),
     })
+    console.log('[Envio] Strategies response:', data)
+    console.log('[Envio] Found', data.Strategy?.length || 0, 'strategies')
     // Add computed isActive field for backward compatibility
-    return data.Strategy.map(s => ({
+    return (data.Strategy || []).map(s => ({
       ...s,
       isActive: s.status === 'ACTIVE'
     }))
   } catch (error) {
-    console.error('Error fetching user strategies:', error)
+    console.error('[Envio] Error fetching user strategies:', error)
     return []
   }
 }
@@ -152,12 +170,15 @@ export async function getStrategyExecutions(strategyId: string): Promise<Executi
 
 export async function getAllExecutionsByUser(userAddress: string): Promise<Execution[]> {
   try {
+    console.log('[Envio] Fetching executions for user:', userAddress.toLowerCase())
     const data = await envioClient.request<{ Execution: Execution[] }>(GET_ALL_EXECUTIONS_BY_USER, {
       user: userAddress.toLowerCase(),
     })
-    return data.Execution
+    console.log('[Envio] Executions response:', data)
+    console.log('[Envio] Found', data.Execution?.length || 0, 'executions')
+    return data.Execution || []
   } catch (error) {
-    console.error('Error fetching user executions:', error)
+    console.error('[Envio] Error fetching user executions:', error)
     return []
   }
 }

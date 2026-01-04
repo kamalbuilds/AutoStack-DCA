@@ -7,17 +7,17 @@ export interface TokenInfo {
   logo: string
 }
 
-// Base Sepolia token addresses mapped to their metadata
+// Base Mainnet token addresses mapped to their metadata
 export const TOKENS: Record<string, TokenInfo> = {
-  // USDC on Base Sepolia
-  '0x036cbd53842c5426634e7929541ec2318f3dcf7e': {
-    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  // USDC on Base Mainnet
+  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': {
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
     logo: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
   },
-  // WETH on Base Sepolia
+  // WETH on Base Mainnet
   '0x4200000000000000000000000000000000000006': {
     address: '0x4200000000000000000000000000000000000006',
     symbol: 'WETH',
@@ -25,29 +25,29 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     logo: 'https://assets.coingecko.com/coins/images/2518/small/weth.png',
   },
-  // Mock Token (for testing)
-  '0x79af545b3a91ac01ecb6c7a9f17ba6aee9ffcccd': {
-    address: '0x79aF545B3A91Ac01ecb6c7a9F17Ba6aee9fFCcCd',
-    symbol: 'MTK',
-    name: 'Mock Token',
-    decimals: 18,
-    logo: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-  },
-  // DAI
-  '0x7683022d84f726a96c4a6611cd31dbf5409c0ac9': {
-    address: '0x7683022d84F726a96c4A6611cD31DBf5409c0Ac9',
+  // DAI on Base Mainnet
+  '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': {
+    address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
     symbol: 'DAI',
     name: 'Dai Stablecoin',
     decimals: 18,
     logo: 'https://assets.coingecko.com/coins/images/9956/small/Badge_Dai.png',
   },
-  // cbETH
-  '0x774ef4152d80e1c4f8d2b6a9a5dce10ed3b5a3c8': {
-    address: '0x774eF4152d80E1c4f8d2b6a9a5dce10eD3B5a3c8',
+  // cbETH on Base Mainnet
+  '0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22': {
+    address: '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22',
     symbol: 'cbETH',
     name: 'Coinbase Wrapped ETH',
     decimals: 18,
     logo: 'https://assets.coingecko.com/coins/images/27008/small/cbeth.png',
+  },
+  // USDbC (bridged USDC) on Base Mainnet
+  '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca': {
+    address: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA',
+    symbol: 'USDbC',
+    name: 'Bridged USDC',
+    decimals: 6,
+    logo: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
   },
 }
 

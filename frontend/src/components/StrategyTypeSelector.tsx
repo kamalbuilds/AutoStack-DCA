@@ -1,7 +1,9 @@
 'use client'
 
+import { STRATEGY_TYPES as CONTRACT_STRATEGY_TYPES } from '@/lib/contracts'
+
 interface StrategyType {
-  id: string
+  id: number
   name: string
   description: string
   icon: React.ReactNode
@@ -11,7 +13,7 @@ interface StrategyType {
 
 const STRATEGY_TYPES: StrategyType[] = [
   {
-    id: 'basic',
+    id: CONTRACT_STRATEGY_TYPES.BASIC_DCA,
     name: 'Basic DCA',
     description: 'Time-based recurring purchases at fixed intervals',
     icon: (
@@ -22,7 +24,7 @@ const STRATEGY_TYPES: StrategyType[] = [
     gradient: 'from-[#6b7280] to-[#4b5563]',
   },
   {
-    id: 'smart-money',
+    id: CONTRACT_STRATEGY_TYPES.SMART_MONEY_DCA,
     name: 'Smart Money DCA',
     description: 'Buy when whales and institutional traders buy',
     icon: (
@@ -30,27 +32,27 @@ const STRATEGY_TYPES: StrategyType[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
-    badge: 'x402 + Nansen',
+    badge: 'Nansen + x402',
     gradient: 'from-[#f59e0b] to-[#d97706]',
   },
   {
-    id: 'limit-order',
-    name: 'Limit Order DCA',
-    description: 'Buy automatically when price drops to target',
+    id: CONTRACT_STRATEGY_TYPES.SMART_ACCUMULATE,
+    name: 'Smart Accumulate',
+    description: 'Wait for multiple whale signals before each buy',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
       </svg>
     ),
     gradient: 'from-[#10b981] to-[#059669]',
   },
   {
-    id: 'smart-accumulate',
-    name: 'Smart Accumulate',
-    description: 'Combine smart money signals with price targets',
+    id: CONTRACT_STRATEGY_TYPES.HYBRID,
+    name: 'Hybrid Strategy',
+    description: 'Combines time-based DCA with smart money signals',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
       </svg>
     ),
     badge: 'Pro',
@@ -59,8 +61,8 @@ const STRATEGY_TYPES: StrategyType[] = [
 ]
 
 interface StrategyTypeSelectorProps {
-  selected: string
-  onSelect: (id: string) => void
+  selected: number
+  onSelect: (id: number) => void
 }
 
 export function StrategyTypeSelector({ selected, onSelect }: StrategyTypeSelectorProps) {

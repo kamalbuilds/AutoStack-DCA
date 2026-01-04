@@ -12,9 +12,9 @@
  * 4. Retry and receive data
  */
 
-import { createPublicClient, createWalletClient, http, parseAbi, formatUnits, parseUnits } from 'viem';
+import { createPublicClient, createWalletClient, http, parseAbi, formatUnits, parseUnits, encodeFunctionData } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { GraphQLClient, gql } from 'graphql-request';
 import { wrap } from '@faremeter/fetch';
 import { createPaymentHandler } from '@faremeter/payment-solana/exact';
@@ -24,8 +24,8 @@ import 'dotenv/config';
 // ============ Configuration ============
 
 const CONFIG = {
-  // EVM Configuration (Base Sepolia for contract execution)
-  rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  // EVM Configuration (Base Mainnet for contract execution)
+  rpcUrl: process.env.BASE_RPC_URL || 'https://mainnet.base.org',
   privateKey: process.env.WORKER_PRIVATE_KEY!,
   contractAddress: process.env.SMART_MONEY_CONTRACT_ADDRESS as `0x${string}`,
 
@@ -55,21 +55,23 @@ const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 // ============ Contract ABI ============
 
 const SMART_MONEY_DCA_ABI = parseAbi([
-  'function executeWithSmartMoneySignal(uint256 strategyId, tuple(address wallet, string label, uint256 score, uint256 amount, uint256 timestamp, bytes32 txHash) signal, bytes swapData) external',
-  'function executeTimeBased(uint256 strategyId, bytes swapData) external',
-  'function canExecute(uint256 strategyId) external view returns (bool, string)',
-  'function getStrategy(uint256 strategyId) external view returns (tuple(uint256 id, address user, uint8 strategyType, uint8 triggerType, address tokenIn, address tokenOut, uint256 amountPerExecution, uint256 totalBudget, uint256 usedBudget, uint256 maxExecutions, uint256 executionsCompleted, uint256 minInterval, uint256 lastExecution, uint256 expiresAt, bool active, uint256 createdAt, bytes32 smartMoneyConfigHash, bytes32 priceConfigHash))',
+  'function executeWithSmartMoneySignal(uint256 strategyId, tuple(address wallet, uint256 amountUsd, uint8 labelScore, bytes32 txHash, uint256 timestamp) signal) external',
+  'function executeDCA(uint256 strategyId) external',
+  'function canExecuteTimeBased(uint256 strategyId) external view returns (bool)',
+  'function canExecuteSmartMoney(uint256 strategyId) external view returns (bool)',
+  'function getStrategy(uint256 strategyId) external view returns (tuple(address user, address tokenIn, address tokenOut, uint24 poolFee, uint256 amountPerExecution, uint256 frequency, uint256 executionsLeft, uint256 lastExecution, uint256 totalAmountIn, uint256 totalAmountOut, uint8 strategyType, tuple(uint256 minWhaleAmount, uint8 minLabelScore, uint8 signalThreshold, uint256 signalWindow, bool enabled) smartMoneyConfig, bool active))',
+  'function getSmartMoneyConfig(uint256 strategyId) external view returns (tuple(uint256 minWhaleAmount, uint8 minLabelScore, uint8 signalThreshold, uint256 signalWindow, bool enabled))',
+  'function getSignalAccumulator(uint256 strategyId) external view returns (uint8 signalCount, uint256 windowStart, uint256 processedCount)',
 ]);
 
 // ============ Types ============
 
 interface SmartMoneySignal {
   wallet: `0x${string}`;
-  label: string;
-  score: bigint;
-  amount: bigint;
-  timestamp: bigint;
+  amountUsd: bigint;
+  labelScore: number;
   txHash: `0x${string}`;
+  timestamp: bigint;
 }
 
 interface NansenDexTrade {
@@ -113,13 +115,13 @@ interface Strategy {
 const account = privateKeyToAccount(CONFIG.privateKey as `0x${string}`);
 
 const publicClient = createPublicClient({
-  chain: baseSepolia,
+  chain: base,
   transport: http(CONFIG.rpcUrl),
 });
 
 const walletClient = createWalletClient({
   account,
-  chain: baseSepolia,
+  chain: base,
   transport: http(CONFIG.rpcUrl),
 });
 
@@ -333,11 +335,10 @@ function isValidSmartMoneySignal(trade: NansenDexTrade): boolean {
 function tradeToSignal(trade: NansenDexTrade): SmartMoneySignal {
   return {
     wallet: trade.wallet_address as `0x${string}`,
-    label: trade.labels.join(', '),
-    score: BigInt(Math.floor(trade.smart_money_score)),
-    amount: BigInt(Math.floor(trade.amount_usd * 1e6)),
-    timestamp: BigInt(Math.floor(new Date(trade.block_timestamp).getTime() / 1000)),
+    amountUsd: BigInt(Math.floor(trade.amount_usd * 1e6)), // Convert to 6 decimals
+    labelScore: Math.floor(trade.smart_money_score),
     txHash: trade.transaction_hash as `0x${string}`,
+    timestamp: BigInt(Math.floor(new Date(trade.block_timestamp).getTime() / 1000)),
   };
 }
 
@@ -373,34 +374,39 @@ async function executeSmartMoneyStrategy(
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   console.log(`\n[Execute] Smart Money Strategy #${strategyId}`);
   console.log(`  Whale: ${signal.wallet.slice(0, 10)}...${signal.wallet.slice(-6)}`);
-  console.log(`  Label: ${signal.label}`);
-  console.log(`  Score: ${signal.score}`);
-  console.log(`  Amount: $${formatUnits(signal.amount, 6)}`);
+  console.log(`  Score: ${signal.labelScore}`);
+  console.log(`  Amount: $${formatUnits(signal.amountUsd, 6)}`);
 
   try {
-    // Check if strategy can be executed
-    const result = await publicClient.readContract({
+    // Check if strategy can be executed with smart money
+    const canExec = await publicClient.readContract({
       address: CONFIG.contractAddress,
       abi: SMART_MONEY_DCA_ABI,
-      functionName: 'canExecute',
+      functionName: 'canExecuteSmartMoney',
       args: [BigInt(strategyId)],
-    }) as [boolean, string];
-
-    const [canExec, reason] = result;
+    }) as boolean;
 
     if (!canExec) {
-      console.log(`  ❌ Cannot execute: ${reason}`);
-      return { success: false, error: reason };
+      console.log(`  ❌ Cannot execute: Strategy not eligible for smart money execution`);
+      return { success: false, error: 'Not eligible for smart money execution' };
     }
 
-    console.log(`  ✓ Execution conditions met`);
+    // Get current signal accumulator state
+    const [signalCount, windowStart, processedCount] = await publicClient.readContract({
+      address: CONFIG.contractAddress,
+      abi: SMART_MONEY_DCA_ABI,
+      functionName: 'getSignalAccumulator',
+      args: [BigInt(strategyId)],
+    }) as [number, bigint, bigint];
+
+    console.log(`  Signal accumulator: ${signalCount} signals in window`);
 
     // Execute with smart money signal
     const hash = await walletClient.writeContract({
       address: CONFIG.contractAddress,
       abi: SMART_MONEY_DCA_ABI,
       functionName: 'executeWithSmartMoneySignal',
-      args: [BigInt(strategyId), signal, '0x'],
+      args: [BigInt(strategyId), signal],
     });
 
     console.log(`  📝 Transaction: ${hash}`);
@@ -506,9 +512,9 @@ async function checkWorkerHealth(): Promise<void> {
   console.log('\n🏥 Worker Health Check');
   console.log('─'.repeat(40));
 
-  // Check EVM wallet balance (Base Sepolia)
+  // Check EVM wallet balance (Base Mainnet)
   const ethBalance = await publicClient.getBalance({ address: account.address });
-  console.log(`  ETH Balance (Base Sepolia): ${formatUnits(ethBalance, 18)} ETH`);
+  console.log(`  ETH Balance (Base): ${formatUnits(ethBalance, 18)} ETH`);
 
   // Check Solana wallet for x402 payments
   if (CONFIG.solanaPrivateKey) {

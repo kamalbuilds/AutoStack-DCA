@@ -259,7 +259,7 @@ export default function DashboardPage() {
                               </td>
                               <td>
                                 <a
-                                  href={`https://sepolia.basescan.org/tx/${execution.transactionHash}`}
+                                  href={`https://basescan.org/tx/${execution.transactionHash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="link-accent inline-flex items-center gap-1 text-sm"

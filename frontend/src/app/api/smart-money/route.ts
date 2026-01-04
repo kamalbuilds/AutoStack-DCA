@@ -213,9 +213,6 @@ async function getX402Client(): Promise<typeof fetch> {
       },
       retryCount: 3,
       initialRetryDelay: 1000,
-      onPaymentAttempt: (attempt: any) => {
-        console.log('[x402] Payment attempt:', JSON.stringify(attempt, null, 2));
-      },
     });
 
     console.log('[x402] Client initialized successfully');
@@ -328,15 +325,11 @@ export async function GET(request: Request) {
     const signals = (data.data as NansenDexTrade[]).map((trade, index) => ({
       id: `${trade.transaction_hash}-${index}`,
       wallet: trade.trader_address,
-      walletLabel: trade.trader_address_label || 'Smart Money',
+      label: trade.trader_address_label || 'Smart Money',
       chain: trade.chain,
-      tokenBought: trade.token_bought_address,
-      tokenBoughtSymbol: trade.token_bought_symbol || getTokenSymbol(trade.token_bought_address),
-      tokenBoughtAmount: trade.token_bought_amount,
-      tokenSold: trade.token_sold_address,
-      tokenSoldSymbol: trade.token_sold_symbol || 'TOKEN',
-      tokenSoldAmount: trade.token_sold_amount,
-      tradeValueUsd: trade.trade_value_usd,
+      token: trade.token_bought_address,
+      tokenSymbol: trade.token_bought_symbol || getTokenSymbol(trade.token_bought_address),
+      amount: trade.trade_value_usd || trade.token_bought_amount,
       action: 'buy' as const,
       timestamp: Math.floor(new Date(trade.block_timestamp).getTime() / 1000),
       txHash: trade.transaction_hash,

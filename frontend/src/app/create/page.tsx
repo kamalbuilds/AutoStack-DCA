@@ -6,16 +6,21 @@ import { useRouter } from 'next/navigation'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits } from 'viem'
 import { ConnectButton } from '@/components/ConnectButton'
+import { StrategyTypeSelector } from '@/components/StrategyTypeSelector'
+import { SmartMoneyConfig, DEFAULT_SMART_MONEY_CONFIG, type SmartMoneyConfigData } from '@/components/SmartMoneyConfig'
 import {
-  AUTOSTACK_DCA_ADDRESS,
-  AUTOSTACK_DCA_ABI,
+  AUTOSTACK_DCA_V2_ADDRESS,
+  AUTOSTACK_DCA_V2_ABI,
   ERC20_ABI,
   FREQUENCY,
+  POOL_FEES,
+  STRATEGY_TYPES,
   SUPPORTED_TOKENS,
   type TokenSymbol,
 } from '@/lib/contracts'
 
-type FrequencyOption = 'daily' | 'weekly'
+type FrequencyOption = 'hourly' | 'daily' | 'weekly'
+type PoolFeeOption = 'LOW' | 'MEDIUM' | 'HIGH'
 
 // Get token symbols as array for dropdowns
 const TOKEN_OPTIONS = Object.keys(SUPPORTED_TOKENS) as TokenSymbol[]
@@ -31,6 +36,9 @@ export default function CreateStrategyPage() {
   const [tokenOut, setTokenOut] = useState<TokenSymbol>('WETH')
   const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
   const [showTokenOutDropdown, setShowTokenOutDropdown] = useState(false)
+  const [strategyType, setStrategyType] = useState<number>(STRATEGY_TYPES.BASIC_DCA)
+  const [smartMoneyConfig, setSmartMoneyConfig] = useState<SmartMoneyConfigData>(DEFAULT_SMART_MONEY_CONFIG)
+  const [poolFee, setPoolFee] = useState<PoolFeeOption>('MEDIUM')
 
   const tokenSelectorRef = useRef<HTMLDivElement>(null)
 
@@ -57,11 +65,19 @@ export default function CreateStrategyPage() {
     hash: createHash,
   })
 
-  const frequencyInSeconds = frequency === 'daily' ? FREQUENCY.DAILY : FREQUENCY.WEEKLY
+  const frequencyInSeconds = frequency === 'hourly'
+    ? FREQUENCY.HOURLY
+    : frequency === 'daily'
+      ? FREQUENCY.DAILY
+      : FREQUENCY.WEEKLY
 
   // Get selected token info
   const selectedTokenIn = SUPPORTED_TOKENS[tokenIn]
   const selectedTokenOut = SUPPORTED_TOKENS[tokenOut]
+
+  // Check if smart money config is needed
+  const needsSmartMoneyConfig = strategyType !== STRATEGY_TYPES.BASIC_DCA
+  const needsSignalAccumulation = strategyType === STRATEGY_TYPES.SMART_ACCUMULATE || strategyType === STRATEGY_TYPES.HYBRID
 
   const handleApprove = async () => {
     if (!amount || !executions) return
@@ -73,7 +89,7 @@ export default function CreateStrategyPage() {
       address: selectedTokenIn.address,
       abi: ERC20_ABI,
       functionName: 'approve',
-      args: [AUTOSTACK_DCA_ADDRESS, totalAmount],
+      args: [AUTOSTACK_DCA_V2_ADDRESS, totalAmount],
     })
 
     setStep('approve')
@@ -83,13 +99,68 @@ export default function CreateStrategyPage() {
     if (!amount || !executions) return
 
     const amountInWei = parseUnits(amount, selectedTokenIn.decimals)
+    const selectedPoolFee = POOL_FEES[poolFee]
 
-    writeCreate({
-      address: AUTOSTACK_DCA_ADDRESS,
-      abi: AUTOSTACK_DCA_ABI,
-      functionName: 'createStrategy',
-      args: [selectedTokenIn.address, selectedTokenOut.address, amountInWei, frequencyInSeconds, BigInt(executions)],
-    })
+    if (strategyType === STRATEGY_TYPES.BASIC_DCA) {
+      // Basic DCA - no smart money config
+      writeCreate({
+        address: AUTOSTACK_DCA_V2_ADDRESS,
+        abi: AUTOSTACK_DCA_V2_ABI,
+        functionName: 'createStrategy',
+        args: [
+          selectedTokenIn.address,
+          selectedTokenOut.address,
+          amountInWei,
+          frequencyInSeconds,
+          BigInt(executions),
+          selectedPoolFee,
+        ],
+      })
+    } else if (strategyType === STRATEGY_TYPES.SMART_MONEY_DCA || strategyType === STRATEGY_TYPES.SMART_ACCUMULATE) {
+      // Smart Money DCA or Smart Accumulate
+      const minWhaleAmountWei = BigInt(smartMoneyConfig.minWhaleAmount) * 10n ** 6n // USDC decimals
+      const signalWindowSeconds = BigInt(smartMoneyConfig.signalWindow) * 3600n // Hours to seconds
+
+      writeCreate({
+        address: AUTOSTACK_DCA_V2_ADDRESS,
+        abi: AUTOSTACK_DCA_V2_ABI,
+        functionName: 'createSmartMoneyStrategy',
+        args: [
+          selectedTokenIn.address,
+          selectedTokenOut.address,
+          amountInWei,
+          frequencyInSeconds,
+          BigInt(executions),
+          selectedPoolFee,
+          minWhaleAmountWei,
+          smartMoneyConfig.minLabelScore,
+          smartMoneyConfig.signalThreshold,
+          signalWindowSeconds,
+        ],
+      })
+    } else if (strategyType === STRATEGY_TYPES.HYBRID) {
+      // Hybrid Strategy
+      const minWhaleAmountWei = BigInt(smartMoneyConfig.minWhaleAmount) * 10n ** 6n
+      const signalWindowSeconds = BigInt(smartMoneyConfig.signalWindow) * 3600n
+
+      writeCreate({
+        address: AUTOSTACK_DCA_V2_ADDRESS,
+        abi: AUTOSTACK_DCA_V2_ABI,
+        functionName: 'createHybridStrategy',
+        args: [
+          selectedTokenIn.address,
+          selectedTokenOut.address,
+          amountInWei,
+          frequencyInSeconds,
+          BigInt(executions),
+          selectedPoolFee,
+          minWhaleAmountWei,
+          smartMoneyConfig.minLabelScore,
+          smartMoneyConfig.signalThreshold,
+          signalWindowSeconds,
+        ],
+      })
+    }
 
     setStep('create')
   }
@@ -102,6 +173,16 @@ export default function CreateStrategyPage() {
   }
 
   const totalAmount = amount && executions ? (parseFloat(amount) * parseInt(executions)).toFixed(2) : '0.00'
+
+  const getStrategyTypeName = (type: number) => {
+    switch (type) {
+      case STRATEGY_TYPES.BASIC_DCA: return 'Basic DCA'
+      case STRATEGY_TYPES.SMART_MONEY_DCA: return 'Smart Money DCA'
+      case STRATEGY_TYPES.SMART_ACCUMULATE: return 'Smart Accumulate'
+      case STRATEGY_TYPES.HYBRID: return 'Hybrid Strategy'
+      default: return 'Unknown'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-animated">
@@ -133,7 +214,7 @@ export default function CreateStrategyPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[--text-primary] mb-2">Create DCA Strategy</h1>
             <p className="text-[--text-secondary]">
-              Set up automated token swaps on Base Sepolia. Choose your token pair and schedule.
+              Set up automated token swaps on Base. Choose your strategy type and configure parameters.
             </p>
           </div>
 
@@ -149,6 +230,15 @@ export default function CreateStrategyPage() {
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Strategy Type Selector */}
+              <StrategyTypeSelector
+                selected={strategyType}
+                onSelect={(type) => {
+                  setStrategyType(type)
+                  setStep('form')
+                }}
+              />
+
               {/* Token Pair Selector */}
               <div ref={tokenSelectorRef}>
                 <label className="block text-sm font-medium text-[--text-secondary] mb-3">Token Pair</label>
@@ -267,6 +357,32 @@ export default function CreateStrategyPage() {
                 </div>
               </div>
 
+              {/* Pool Fee Selector */}
+              <div>
+                <label className="block text-sm font-medium text-[--text-secondary] mb-3">Pool Fee Tier</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['LOW', 'MEDIUM', 'HIGH'] as PoolFeeOption[]).map((fee) => (
+                    <button
+                      key={fee}
+                      type="button"
+                      onClick={() => setPoolFee(fee)}
+                      className={`p-3 rounded-xl border-2 text-center transition-all duration-200 ${
+                        poolFee === fee
+                          ? 'border-[#7c3aed] bg-[#7c3aed]/5'
+                          : 'border-[--border-subtle] hover:border-[--border-default] bg-[--surface-1]'
+                      }`}
+                    >
+                      <div className={`font-semibold ${poolFee === fee ? 'text-[--text-primary]' : 'text-[--text-secondary]'}`}>
+                        {fee === 'LOW' ? '0.05%' : fee === 'MEDIUM' ? '0.3%' : '1%'}
+                      </div>
+                      <div className="text-xs text-[--text-tertiary]">
+                        {fee === 'LOW' ? 'Stable pairs' : fee === 'MEDIUM' ? 'Standard' : 'Exotic'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Amount per Execution */}
               <div>
                 <label className="block text-sm font-medium text-[--text-secondary] mb-3">
@@ -291,7 +407,30 @@ export default function CreateStrategyPage() {
               {/* Frequency */}
               <div>
                 <label className="block text-sm font-medium text-[--text-secondary] mb-3">Frequency</label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFrequency('hourly')}
+                    className={`selection-btn text-left ${frequency === 'hourly' ? 'active' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        frequency === 'hourly'
+                          ? 'bg-[#7c3aed]/20'
+                          : 'bg-[--surface-2]'
+                      }`}>
+                        <svg className={`w-5 h-5 ${frequency === 'hourly' ? 'text-[#a78bfa]' : 'text-[--text-tertiary]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className={`font-semibold ${frequency === 'hourly' ? 'text-[--text-primary]' : 'text-[--text-secondary]'}`}>
+                          Hourly
+                        </div>
+                        <div className="text-xs text-[--text-tertiary]">Every hour</div>
+                      </div>
+                    </div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setFrequency('daily')}
@@ -311,7 +450,7 @@ export default function CreateStrategyPage() {
                         <div className={`font-semibold ${frequency === 'daily' ? 'text-[--text-primary]' : 'text-[--text-secondary]'}`}>
                           Daily
                         </div>
-                        <div className="text-xs text-[--text-tertiary]">Every 24 hours</div>
+                        <div className="text-xs text-[--text-tertiary]">Every 24h</div>
                       </div>
                     </div>
                   </button>
@@ -362,13 +501,32 @@ export default function CreateStrategyPage() {
                 </div>
               </div>
 
+              {/* Smart Money Config (conditional) */}
+              {needsSmartMoneyConfig && (
+                <div className="rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/[0.06] p-6">
+                  <SmartMoneyConfig
+                    config={smartMoneyConfig}
+                    onChange={setSmartMoneyConfig}
+                    showSignalAccumulation={needsSignalAccumulation}
+                  />
+                </div>
+              )}
+
               {/* Summary */}
               <div className="glass-card p-5 space-y-4">
                 <h3 className="font-semibold text-[--text-primary]">Strategy Summary</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
+                    <span className="text-[--text-tertiary]">Strategy Type</span>
+                    <span className="text-[--text-primary] font-medium">{getStrategyTypeName(strategyType)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-[--text-tertiary]">Swapping</span>
                     <span className="text-[--text-primary] font-medium">{selectedTokenIn.symbol} → {selectedTokenOut.symbol}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[--text-tertiary]">Pool Fee</span>
+                    <span className="text-[--text-primary] font-medium">{poolFee === 'LOW' ? '0.05%' : poolFee === 'MEDIUM' ? '0.3%' : '1%'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-[--text-tertiary]">Amount per execution</span>
@@ -376,12 +534,39 @@ export default function CreateStrategyPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-[--text-tertiary]">Frequency</span>
-                    <span className="text-[--text-primary] font-medium">{frequency === 'daily' ? 'Daily' : 'Weekly'}</span>
+                    <span className="text-[--text-primary] font-medium">
+                      {frequency === 'hourly' ? 'Hourly' : frequency === 'daily' ? 'Daily' : 'Weekly'}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-[--text-tertiary]">Total executions</span>
                     <span className="text-[--text-primary] font-medium">{executions || '0'}</span>
                   </div>
+                  {needsSmartMoneyConfig && (
+                    <>
+                      <div className="h-px bg-[--border-subtle]" />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[--text-tertiary]">Min whale amount</span>
+                        <span className="text-[--text-primary] font-medium">${smartMoneyConfig.minWhaleAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[--text-tertiary]">Min label score</span>
+                        <span className="text-[--text-primary] font-medium">{smartMoneyConfig.minLabelScore}/100</span>
+                      </div>
+                      {needsSignalAccumulation && (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-[--text-tertiary]">Signal threshold</span>
+                            <span className="text-[--text-primary] font-medium">{smartMoneyConfig.signalThreshold} signals</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-[--text-tertiary]">Signal window</span>
+                            <span className="text-[--text-primary] font-medium">{smartMoneyConfig.signalWindow}h</span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
                   <div className="h-px bg-[--border-subtle]" />
                   <div className="flex justify-between">
                     <span className="text-[--text-secondary] font-medium">Total amount needed</span>
@@ -418,7 +603,7 @@ export default function CreateStrategyPage() {
                         onClick={handleCreateStrategy}
                         className="w-full py-4 text-lg font-semibold text-white rounded-xl transition-all duration-300 bg-gradient-to-r from-[#10b981] to-[#06b6d4] hover:opacity-90 hover:shadow-lg hover:shadow-[#10b981]/20"
                       >
-                        Create Strategy
+                        Create {getStrategyTypeName(strategyType)}
                       </button>
                     ) : (
                       <button

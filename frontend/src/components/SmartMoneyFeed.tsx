@@ -5,10 +5,10 @@ import { useState, useEffect, useCallback } from 'react'
 interface SmartMoneySignal {
   id: string
   wallet: string
-  label: string
+  label?: string
   token: string
   tokenSymbol: string
-  amount: number
+  amount?: number
   action: 'buy' | 'sell'
   timestamp: number
   txHash: string
@@ -46,13 +46,15 @@ function formatTimeAgo(timestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-function formatUSD(amount: number): string {
+function formatUSD(amount?: number): string {
+  if (!amount && amount !== 0) return '$0'
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
   if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`
   return `$${amount.toFixed(0)}`
 }
 
-function getLabelColor(label: string): string {
+function getLabelColor(label?: string): string {
+  if (!label) return 'from-[#6b7280] to-[#4b5563]'
   const labelLower = label.toLowerCase()
   if (labelLower.includes('smart') || labelLower.includes('trader')) {
     return 'from-[#10b981] to-[#059669]'
@@ -93,12 +95,13 @@ export function SmartMoneyFeed() {
   }, [])
 
   // Fetch smart money data from API - MANUAL ONLY
+  // Using Base chain with lower min_amount threshold for more results
   const fetchSmartMoneyData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch('/api/smart-money?chain=base&limit=20&min_amount=10000')
+      const response = await fetch('/api/smart-money?chain=base&limit=20&min_amount=500')
       const data: ApiResponse = await response.json()
 
       if (!response.ok) {
@@ -283,7 +286,7 @@ export function SmartMoneyFeed() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full bg-gradient-to-r ${getLabelColor(signal.label)} text-white`}>
-                    {signal.label}
+                    {signal.label || 'Smart Money'}
                   </span>
                   {signal.score && signal.score >= 80 && (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] font-medium">
