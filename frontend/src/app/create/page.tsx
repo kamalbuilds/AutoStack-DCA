@@ -8,10 +8,11 @@ import { parseUnits } from 'viem'
 import { ConnectButton } from '@/components/ConnectButton'
 import { StrategyTypeSelector } from '@/components/StrategyTypeSelector'
 import { SmartMoneyConfig, DEFAULT_SMART_MONEY_CONFIG, type SmartMoneyConfigData } from '@/components/SmartMoneyConfig'
+import { useSessionAccount } from '@/providers/SessionAccountProvider'
+import { useAdvancedPermissions, calculateDCAPermission } from '@/hooks/useAdvancedPermissions'
 import {
   AUTOSTACK_DCA_V2_ADDRESS,
   AUTOSTACK_DCA_V2_ABI,
-  ERC20_ABI,
   FREQUENCY,
   POOL_FEES,
   STRATEGY_TYPES,
@@ -31,7 +32,7 @@ export default function CreateStrategyPage() {
   const [amount, setAmount] = useState('')
   const [frequency, setFrequency] = useState<FrequencyOption>('daily')
   const [executions, setExecutions] = useState('')
-  const [step, setStep] = useState<'form' | 'approve' | 'create'>('form')
+  const [step, setStep] = useState<'form' | 'permission' | 'create'>('form')
   const [tokenIn, setTokenIn] = useState<TokenSymbol>('USDC')
   const [tokenOut, setTokenOut] = useState<TokenSymbol>('WETH')
   const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
@@ -39,8 +40,14 @@ export default function CreateStrategyPage() {
   const [strategyType, setStrategyType] = useState<number>(STRATEGY_TYPES.BASIC_DCA)
   const [smartMoneyConfig, setSmartMoneyConfig] = useState<SmartMoneyConfigData>(DEFAULT_SMART_MONEY_CONFIG)
   const [poolFee, setPoolFee] = useState<PoolFeeOption>('MEDIUM')
+  const [permissionGranted, setPermissionGranted] = useState(false)
+  const [permissionError, setPermissionError] = useState<string | null>(null)
 
   const tokenSelectorRef = useRef<HTMLDivElement>(null)
+
+  // ERC-7715 Advanced Permissions hooks
+  const { initializeSessionAccount, sessionAddress, isInitializing: isSessionInitializing } = useSessionAccount()
+  const { requestPermission, isRequesting: isPermissionRequesting, error: permissionHookError } = useAdvancedPermissions()
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -54,12 +61,14 @@ export default function CreateStrategyPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const { writeContract: writeApprove, data: approveHash, isPending: isApprovePending } = useWriteContract()
-  const { writeContract: writeCreate, data: createHash, isPending: isCreatePending } = useWriteContract()
+  // Initialize session account when connected
+  useEffect(() => {
+    if (isConnected && !sessionAddress) {
+      initializeSessionAccount()
+    }
+  }, [isConnected, sessionAddress, initializeSessionAccount])
 
-  const { isLoading: isApproveConfirming, isSuccess: isApproveConfirmed } = useWaitForTransactionReceipt({
-    hash: approveHash,
-  })
+  const { writeContract: writeCreate, data: createHash, isPending: isCreatePending } = useWriteContract()
 
   const { isLoading: isCreateConfirming, isSuccess: isCreateConfirmed } = useWaitForTransactionReceipt({
     hash: createHash,
@@ -79,20 +88,32 @@ export default function CreateStrategyPage() {
   const needsSmartMoneyConfig = strategyType !== STRATEGY_TYPES.BASIC_DCA
   const needsSignalAccumulation = strategyType === STRATEGY_TYPES.SMART_ACCUMULATE || strategyType === STRATEGY_TYPES.HYBRID
 
-  const handleApprove = async () => {
+  // Request ERC-7715 Advanced Permission (replaces ERC20 approve)
+  const handleGrantPermission = async () => {
     if (!amount || !executions) return
 
-    const amountInWei = parseUnits(amount, selectedTokenIn.decimals)
-    const totalAmount = amountInWei * BigInt(executions)
+    setPermissionError(null)
+    setStep('permission')
 
-    writeApprove({
-      address: selectedTokenIn.address,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [AUTOSTACK_DCA_V2_ADDRESS, totalAmount],
-    })
+    try {
+      // Calculate permission parameters for DCA
+      const permissionParams = calculateDCAPermission(
+        selectedTokenIn.address,
+        amount,
+        selectedTokenIn.decimals,
+        Number(frequencyInSeconds),
+        parseInt(executions)
+      )
 
-    setStep('approve')
+      // Request ERC-7715 permission from MetaMask
+      await requestPermission(permissionParams)
+
+      setPermissionGranted(true)
+    } catch (err) {
+      console.error('Permission request failed:', err)
+      setPermissionError(err instanceof Error ? err.message : 'Failed to grant permission')
+      setPermissionGranted(false)
+    }
   }
 
   const handleCreateStrategy = async () => {
@@ -214,7 +235,7 @@ export default function CreateStrategyPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[--text-primary] mb-2">Create DCA Strategy</h1>
             <p className="text-[--text-secondary]">
-              Set up automated token swaps on Base. Choose your strategy type and configure parameters.
+              Set up automated token swaps on Sepolia (ERC-7715 testnet). Choose your strategy type and configure parameters.
             </p>
           </div>
 
@@ -577,40 +598,76 @@ export default function CreateStrategyPage() {
                 </div>
               </div>
 
+              {/* ERC-7715 Advanced Permissions Notice */}
+              <div className="glass-card p-4 border border-[#7c3aed]/20 bg-[#7c3aed]/5">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#7c3aed]/20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-[#a78bfa]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-[--text-primary] text-sm">ERC-7715 Advanced Permissions</h4>
+                    <p className="text-xs text-[--text-tertiary] mt-1">
+                      Uses MetaMask Smart Account with time-limited, amount-capped permissions. Your tokens stay in your wallet until each swap.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="space-y-3 pt-2">
                 {step === 'form' && (
                   <button
-                    onClick={handleApprove}
-                    disabled={!amount || !executions || parseFloat(amount) <= 0 || parseInt(executions) <= 0 || tokenIn === tokenOut}
+                    onClick={handleGrantPermission}
+                    disabled={!amount || !executions || parseFloat(amount) <= 0 || parseInt(executions) <= 0 || tokenIn === tokenOut || isSessionInitializing}
                     className="btn-primary w-full py-4 text-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                   >
-                    Approve {selectedTokenIn.symbol}
+                    {isSessionInitializing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="spinner w-5 h-5" />
+                        Initializing...
+                      </span>
+                    ) : (
+                      `Grant Permission for ${selectedTokenIn.symbol}`
+                    )}
                   </button>
                 )}
 
-                {step === 'approve' && (
+                {step === 'permission' && (
                   <>
-                    {isApprovePending || isApproveConfirming ? (
+                    {isPermissionRequesting ? (
                       <div className="glass-card p-4 flex items-center justify-center gap-3">
                         <div className="spinner" />
                         <span className="text-[--text-secondary]">
-                          {isApprovePending ? 'Confirm in wallet...' : 'Waiting for confirmation...'}
+                          Requesting permission in MetaMask...
                         </span>
                       </div>
-                    ) : isApproveConfirmed ? (
+                    ) : permissionGranted ? (
                       <button
                         onClick={handleCreateStrategy}
                         className="w-full py-4 text-lg font-semibold text-white rounded-xl transition-all duration-300 bg-gradient-to-r from-[#10b981] to-[#06b6d4] hover:opacity-90 hover:shadow-lg hover:shadow-[#10b981]/20"
                       >
                         Create {getStrategyTypeName(strategyType)}
                       </button>
+                    ) : permissionError ? (
+                      <div className="space-y-3">
+                        <div className="glass-card p-4 border border-red-500/20 bg-red-500/5">
+                          <p className="text-red-400 text-sm">{permissionError}</p>
+                        </div>
+                        <button
+                          onClick={handleGrantPermission}
+                          className="btn-primary w-full py-4 text-lg"
+                        >
+                          Retry Permission
+                        </button>
+                      </div>
                     ) : (
                       <button
-                        onClick={handleApprove}
+                        onClick={handleGrantPermission}
                         className="btn-primary w-full py-4 text-lg"
                       >
-                        Retry Approval
+                        Grant Permission
                       </button>
                     )}
                   </>

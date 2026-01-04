@@ -1,9 +1,11 @@
 import { http, createConfig, createStorage, cookieStorage } from 'wagmi'
-import { base } from 'wagmi/chains'
+import { sepolia } from 'wagmi/chains'
 import { injected, metaMask } from 'wagmi/connectors'
 
+// NOTE: ERC-7715 Advanced Permissions currently only work on Sepolia
+// See: https://docs.metamask.io/smart-accounts-kit/get-started/supported-networks/
 export const config = createConfig({
-  chains: [base],
+  chains: [sepolia],
   connectors: [
     injected(),
     metaMask({
@@ -18,7 +20,7 @@ export const config = createConfig({
     storage: cookieStorage,
   }),
   transports: {
-    [base.id]: http('https://mainnet.base.org'),
+    [sepolia.id]: http('https://ethereum-sepolia-rpc.publicnode.com'),
   },
 })
 

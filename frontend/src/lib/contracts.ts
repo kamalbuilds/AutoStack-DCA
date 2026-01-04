@@ -1,20 +1,21 @@
-// AutoStackDCA V2 Contract Address on Base Mainnet
-// Note: Deploy this contract before using
+// AutoStackDCA V2 Contract Address on Sepolia
+// Note: ERC-7715 Advanced Permissions currently only work on Sepolia
+// See: https://docs.metamask.io/smart-accounts-kit/get-started/supported-networks/
 export const AUTOSTACK_DCA_V2_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}` || '0x0000000000000000000000000000000000000000' as const
 
 // Legacy contract address (for backward compatibility)
 export const AUTOSTACK_DCA_ADDRESS = AUTOSTACK_DCA_V2_ADDRESS
 
-// Base Mainnet token addresses
-export const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const // Base USDC
-export const WETH_ADDRESS = '0x4200000000000000000000000000000000000006' as const // Base WETH
-export const DAI_ADDRESS = '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb' as const // Base DAI
-export const WBTC_ADDRESS = '0x0000000000000000000000000000000000000000' as const // WBTC not on Base yet
-export const CBETH_ADDRESS = '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22' as const // Base cbETH
+// Sepolia testnet token addresses (required for ERC-7715)
+export const USDC_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as const // Sepolia USDC (Circle)
+export const WETH_ADDRESS = '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14' as const // Sepolia WETH
+export const DAI_ADDRESS = '0x68194a729C2450ad26072b3D33ADaCbcef39D574' as const // Sepolia DAI
+export const WBTC_ADDRESS = '0x0000000000000000000000000000000000000000' as const // WBTC not on Sepolia
+export const CBETH_ADDRESS = '0x0000000000000000000000000000000000000000' as const // cbETH not on Sepolia
 
-// Uniswap V3 addresses on Base Mainnet
-export const UNISWAP_ROUTER = '0x2626664c2603336E57B271c5C0b26F421741e481' as const
-export const UNISWAP_QUOTER = '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a' as const
+// Uniswap V3 addresses on Sepolia
+export const UNISWAP_ROUTER = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E' as const // SwapRouter02 on Sepolia
+export const UNISWAP_QUOTER = '0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3' as const // QuoterV2 on Sepolia
 
 // Pool fees
 export const POOL_FEES = {
@@ -31,35 +32,28 @@ export const STRATEGY_TYPES = {
   HYBRID: 3,
 } as const
 
-// Supported tokens with metadata
+// Supported tokens with metadata (Sepolia testnet)
 export const SUPPORTED_TOKENS = {
   USDC: {
     address: USDC_ADDRESS,
     symbol: 'USDC',
-    name: 'USD Coin',
+    name: 'USD Coin (Sepolia)',
     decimals: 6,
     logo: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
   },
   WETH: {
     address: WETH_ADDRESS,
     symbol: 'WETH',
-    name: 'Wrapped Ether',
+    name: 'Wrapped Ether (Sepolia)',
     decimals: 18,
     logo: 'https://assets.coingecko.com/coins/images/2518/small/weth.png',
   },
   DAI: {
     address: DAI_ADDRESS,
     symbol: 'DAI',
-    name: 'Dai Stablecoin',
+    name: 'Dai Stablecoin (Sepolia)',
     decimals: 18,
     logo: 'https://assets.coingecko.com/coins/images/9956/small/Badge_Dai.png',
-  },
-  cbETH: {
-    address: CBETH_ADDRESS,
-    symbol: 'cbETH',
-    name: 'Coinbase Wrapped ETH',
-    decimals: 18,
-    logo: 'https://assets.coingecko.com/coins/images/27008/small/cbeth.png',
   },
 } as const
 
