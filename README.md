@@ -36,7 +36,12 @@ Each signal verification costs ~$0.01 via x402 micropayments.
 
 This project demonstrates cutting-edge technologies working together:
 
-**ERC-7715 Permissions** - The smart contract only gets permission to spend a specific amount over a specific time period. You can revoke anytime.
+**ERC-7715 Advanced Permissions (MetaMask Smart Accounts Kit)** - Instead of traditional ERC20 token approvals, AutoStack uses MetaMask's Smart Accounts Kit to request granular, time-limited permissions via `wallet_grantPermissions`. Users grant periodic spending permissions (e.g., "10 USDC per day for 30 days") that automatically expire. This is fundamentally more secure than unlimited approvals.
+
+Key ERC-7715 features used:
+- `erc20-token-periodic` - Time-bounded, amount-capped token permissions
+- Session accounts - Dedicated accounts that hold permissions and execute on user's behalf
+- Permission redemption - Backend can execute swaps using granted permissions without user signing each transaction
 
 **Envio HyperIndex** - Real-time blockchain indexing. When you create a strategy or execute a swap, the dashboard updates within milliseconds. No polling, no stale data.
 
@@ -46,11 +51,13 @@ This project demonstrates cutting-edge technologies working together:
 
 ## Deployed Contracts
 
-**Base Mainnet:**
-- AutoStackDCA V2: `0x29846754737248d7d81998762B32471967B0c862`
-- USDC: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
-- WETH: `0x4200000000000000000000000000000000000006`
-- Uniswap SwapRouter02: `0x2626664c2603336E57B271c5C0b26F421741e481`
+**Sepolia Testnet (ERC-7715 Required):**
+- AutoStackDCA V2: Deploy your own (see Contract Deployment section)
+- USDC (Circle): `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
+- WETH: `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14`
+- Uniswap SwapRouter02: `0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E`
+
+**Note:** ERC-7715 Advanced Permissions only work on Sepolia. MetaMask's Gator Snaps are not yet deployed on Base or other mainnets.
 
 ## Project Structure
 
@@ -110,9 +117,32 @@ CORBITS_PROXY_URL=https://nansen.api.corbits.dev
 
 ## How It Works
 
+### ERC-7715 Permission Flow
+
+Instead of traditional ERC20 approvals, AutoStack uses MetaMask Advanced Permissions:
+
+1. **Session Account Creation** - App generates a session keypair stored locally
+2. **Permission Request** - App calls `wallet_grantPermissions` with:
+   ```typescript
+   {
+     permission: {
+       type: "erc20-token-periodic",
+       data: {
+         tokenAddress: USDC_ADDRESS,
+         periodAmount: parseUnits("10", 6), // 10 USDC
+         periodDuration: 86400, // 1 day
+       }
+     },
+     signer: { type: "account", data: { address: sessionAccountAddress } },
+     expiry: timestamp + 604800, // 1 week
+   }
+   ```
+3. **User Approval** - MetaMask shows a clear permission dialog with exact limits
+4. **Permission Granted** - Session account can now execute periodic swaps
+
 ### Creating a Strategy
 
-1. User approves USDC spending for the contract
+1. User grants ERC-7715 permission via MetaMask (time-limited, amount-capped)
 2. User calls `createStrategy()` or `createSmartMoneyStrategy()` with parameters:
    - Token pair (e.g., USDC -> WETH)
    - Amount per execution
@@ -207,8 +237,36 @@ export PRIVATE_KEY=your-key
 cast send $CONTRACT "executeDCA(uint256)" 0 --rpc-url $RPC --private-key $PRIVATE_KEY
 ```
 
+## Dependencies
+
+Key packages used:
+
+```json
+{
+  "@metamask/smart-accounts-kit": "^0.x.x",
+  "viem": "^2.x.x",
+  "wagmi": "^3.x.x",
+  "@faremeter/fetch": "^0.15.x",
+  "@faremeter/payment-solana": "^0.15.x"
+}
+```
+
+## Network Requirements
+
+**IMPORTANT: ERC-7715 Advanced Permissions currently only work on Sepolia testnet.**
+
+The MetaMask Gator Snaps required for ERC-7715 are only deployed on Sepolia. The app is configured to use Sepolia for this reason.
+
+To test the ERC-7715 permission flow:
+1. Install MetaMask Flask (developer version)
+2. Connect to Sepolia network
+3. Get Sepolia USDC from a faucet
+4. The Gator Snaps will auto-install when you first request permissions
+
 ## Known Limitations
 
+- ERC-7715 Advanced Permissions only work on **Sepolia testnet** (MetaMask limitation)
+- Requires MetaMask Flask (developer version) with Gator Snaps
 - x402 payments require a funded Solana wallet with mainnet USDC
 - Minimum execution frequency is 60 seconds (for testing; production would be longer)
 - Smart Money triggers depend on Nansen API availability via Corbits
