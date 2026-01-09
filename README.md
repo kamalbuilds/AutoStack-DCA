@@ -8,6 +8,8 @@ AutoStack lets you set up recurring token purchases without depositing funds int
 
 The key difference from existing DCA solutions: your tokens never leave your wallet until the moment of each swap. No lockups, no custody risk.
 
+Demo Video - https://www.youtube.com/watch?v=ABd1zTpaeXs
+
 ## Smart Money Integration
 
 AutoStack now features **Smart Money DCA** - automatically trigger your DCA based on whale activity tracked by Nansen.
